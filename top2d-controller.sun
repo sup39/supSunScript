@@ -1,0 +1,145 @@
+import "ssc/common.sun";
+import "ssc-sup39/common.sun";
+// 描画の関数をインポート(対応するGeckoコードも忘れずに！)
+import "ssc-sup39/draw.sun";
+
+// 平行移動のための行列(48 byte: 817d0000~817d002f)
+var const mtx = $817d0000;
+// mtxを(dx, dy)=(210, 324)の平行移動行列にする
+setMTX(mtx, MTX_NEW, 210.0, 324.0);
+
+while (1) {
+  // 線の太さを16にする
+  setLineWidth(16);
+
+  // 描画の座標にmtxを適用する
+  setMTX(MTX_LOADIMM, mtx);
+  // コントローラ入力の背景となる長方形の描画(描画行列をリセットしない)
+  drawRect($0000003f, STROKE_NONE, -8.0, -8.0, 182.0, 112.0, false);
+
+  /**** メインスティックとCスティックの描画 ****/
+  // メインスティック
+  var const MStickX  = 28.0; // 中心のx座標
+  var const MStickY  = 42.0; // 中心のy座標
+  var const MStickCS = $eeeeeebf; // 輪郭(線)の色
+  var const MStickCF = $eeeeeedf; // スティック本体の円(塗りつぶし)の色
+  // Cスティック
+  var const CStickX  = 60.0;
+  var const CStickY  = 82.0;
+  var const CStickCS = $ffd300bf;
+  var const CStickCF = $ffd300df;
+  // スティック共通
+  var const StickRS  = 20.0; // (輪郭の)半径
+  var const StickRF  = 13.0; // (スティック本体の円の)半径
+  var const StickRO  = 12.0; // スティックの最大移動
+
+  // メインスティックの輪郭(8角形)
+  // 描画の変換表列を【mtx * (半径=StickRS, x座標=MStickX, y座標=MStickY)の行列】にする
+  setMTX(MTX_LOADIMM, mtx, StickRS, MStickX, MStickY);
+  // mtx*(MStickX, MStickY)で半径StickRSの8角形・MStickCS色の輪郭(stroke)が描画される
+  drawNgon(FILL_NONE, MStickCS, 8);
+
+  // Cスティックの輪郭(8角形)
+  setMTX(MTX_LOADIMM, mtx, StickRS, CStickX, CStickY);
+  drawNgon(FILL_NONE, CStickCS, 8);
+
+  // メインスティック本体(円->32角形で近似)
+  setMTX(MTX_LOADIMM, mtx, StickRF,
+    // readRAM(addrMStickX, TYPE_FLOAT)でメインスティック入力(0.0~1.0)を読み込む
+    // 入力が1.0の時に中心(MStickX)からStickROだけ平行移動させる
+    MStickX+readRAM(addrMStickX, TYPE_FLOAT)*StickRO,
+    // 上が負であることに注意
+    MStickY-readRAM(addrMStickY, TYPE_FLOAT)*StickRO
+  );
+  drawNgon(MStickCF, STROKE_NONE, 32);
+
+  // Cスティック本体(円->32角形で近似)
+  setMTX(MTX_LOADIMM, mtx, StickRF,
+    CStickX+readRAM(addrCStickX, TYPE_FLOAT)*StickRO,
+    CStickY-readRAM(addrCStickY, TYPE_FLOAT)*StickRO
+  );
+  drawNgon(CStickCF, STROKE_NONE, 32);
+
+  /**** ボタンの描画 ****/
+  // ボタン入力(16bit)
+  var btn = readRAM(addrButton, 16);
+  var const AButtonX = 134.0;
+  var const AButtonY = 56.0;
+  var const AButtonR = 18.0;
+  var const AButtonC = $2ee5b8bf;
+  var const BButtonX = 109.0;
+  var const BButtonY = 79.0;
+  var const BButtonR = 9.0;
+  var const BButtonC = $ff1a1abf;
+
+  // Aボタンの輪郭と本体(24角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, AButtonR, AButtonX, AButtonY);
+  // [Aが押された場合 ? AButtonC色で塗りつぶす : 塗りつぶしなし]
+  drawNgon([btn&PRESS_A ? AButtonC : FILL_NONE], AButtonC, 24);
+  // Bボタンの輪郭と本体(16角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, BButtonR, BButtonX, BButtonY);
+  drawNgon([btn&PRESS_B ? BButtonC : FILL_NONE], BButtonC, 16);
+
+  var const XButtonX = 160.0;
+  var const XButtonY = 40.0;
+  var const XButtonR = 8.0;
+  var const XButtonC = $eeeeeebf;
+  var const YButtonX = 115.0;
+  var const YButtonY = 31.0;
+  var const YButtonR = 8.0;
+  var const YButtonC = $eeeeeebf;
+  var const ZButtonX = 140.0;
+  var const ZButtonY = 21.0;
+  var const ZButtonR = 5.0;
+  var const ZButtonC = $9494ffbf;
+  var const SButtonX = 87.0; // スタート
+  var const SButtonY = 54.0;
+  var const SButtonR = 5.0;
+  var const SButtonC = $eeeeeebf;
+  // Xボタンの輪郭と本体(16角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, XButtonR, XButtonX, XButtonY);
+  drawNgon([btn&PRESS_X ? XButtonC : FILL_NONE], XButtonC, 16);
+  // Yボタンの輪郭と本体(16角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, YButtonR, YButtonX, YButtonY);
+  drawNgon([btn&PRESS_Y ? YButtonC : FILL_NONE], YButtonC, 16);
+  // Zボタンの輪郭と本体(16角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, ZButtonR, ZButtonX, ZButtonY);
+  drawNgon([btn&PRESS_Z ? ZButtonC : FILL_NONE], ZButtonC, 16);
+  // スタートボタンの輪郭と本体(16角形で円を近似)
+  setMTX(MTX_LOADIMM, mtx, SButtonR, SButtonX, SButtonY);
+  drawNgon([btn&PRESS_S ? SButtonC : FILL_NONE], SButtonC, 16);
+
+  /**** トリガーの描画 ****/
+  var const LTriggerX0 = 8.0;
+  var const RTriggerX1 = 166.0;
+  var const TriggerW   = 64.0;
+  var const TriggerY0  = 0.0;
+  var const TriggerH   = 8.0;
+  var const TriggerFill = $dfdfdfbf;
+  var const TriggerStroke = $eeeeeebf;
+  // Lトリガーの輪郭
+  setMTX(MTX_LOADIMM, mtx, TriggerW, TriggerH, LTriggerX0, TriggerY0);
+  drawRect(FILL_NONE, TriggerStroke, 0, 0, 1, 1, false);
+  // Lトリガーの塗りつぶし
+  setMTX(MTX_LOADIMM, mtx,
+    // Lが押された ? 1.0倍 : 0.9倍の入力(0.0~1.0)
+    TriggerW * [btn&PRESS_L ? 1.0 : 0.9*readRAM(addrLTrig, TYPE_FLOAT)],
+    TriggerH, LTriggerX0, TriggerY0);
+  drawRect(TriggerFill, STROKE_NONE, 0, 0, 1, 1, false);
+  // Rトリガーの輪郭
+  setMTX(MTX_LOADIMM, mtx, -TriggerW, TriggerH, RTriggerX1, TriggerY0);
+  drawRect(FILL_NONE, TriggerStroke, 0, 0, 1, 1, false);
+  // Rトリガーの塗りつぶし
+  setMTX(MTX_LOADIMM, mtx,
+    // 左側に延びることに注意
+    TriggerW*[btn&PRESS_R ? -1.0 : -0.9*readRAM(addrRTrig, TYPE_FLOAT)],
+    TriggerH, RTriggerX1, TriggerY0);
+  drawRect(TriggerFill, STROKE_NONE, 0, 0, 1, 1, false);
+
+  /**** その他(常に)描画したものがあれば ****/
+  drawRect($00ffff1a, 232, 438, 362, 462); // (描画の行列をリセット)
+  drawText(234, 460, 20, $de4977ff, $f6f6f6ff, "ミファーxシド");
+
+  // 各フレームの描画はここまで
+  yield;
+}

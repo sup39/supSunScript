@@ -1,0 +1,73 @@
+/**** [1] インポート ****/
+import "ssc/common.sun";
+import "ssc-sup39/common.sun";
+
+/**** [2] 変数宣言 ****/
+// ポインタの準備
+var itemManager = readRAM(gpItemManager);
+var const slotBase = $817d1000;
+// 赤コイン数のフラグID
+var const SYSF_REDCOINNUM = 0x60000;
+// セーブした状態があるかどうか(初期化を確保)
+var ready = 0;
+// 前のQFに押されたボタン
+var btn0 = 0;
+// 局所変数
+var slot, var itemCount, var ptrItem;
+
+/**** [3] メイン関数 ****/
+while (1) {
+  // 押されたボタン(16 bitの整数)
+  var btn = readRAM(addrButton, 16);
+
+  if (btn == PRESS_DL && !(btn0 & PRESS_DL)) {
+    /** セーブ **/
+    /*
+      押されたボタンは十字キー左であり、
+      前に押されたボタンに十字キー左が含まれない
+      (押された瞬間だけ考える。押しっぱなしは無視)
+    */
+    // 準備
+    ready = 1; // これでセーブした状態がある
+    slot = slotBase; // セーブする状態へのポインタをリセット
+    // 赤コイン数
+    writeRAM(slot, getSystemFlag(SYSF_REDCOINNUM));
+    slot += 4;
+    // アイテムの状態
+    itemCount = readRAM(itemManager+0x14);
+    ptrItem = readRAM(itemManager+0x18);
+    while (itemCount--) { // 各アイテムに対して
+      // セーブ
+      writeRAM(slot, readRAM(readRAM(ptrItem)+0xf0));
+      // 次へ
+      ptrItem += 4;
+      slot += 4;
+    }
+  } else if (btn == PRESS_DR && !(btn0 & PRESS_DR) && ready) {
+    /* ロード */
+    /*
+      押されたボタンは十字キー右であり、
+      前に押されたボタンに十字キー右が含まれない
+      かつ既にセーブした状態がある
+    */
+    slot = slotBase; // セーブした状態へのポインタをリセット
+    // 赤コイン数
+    setSystemFlag(SYSF_REDCOINNUM, readRAM(slot));
+    slot += 4;
+    // アイテムの状態
+    itemCount = readRAM(itemManager+0x14);
+    ptrItem = readRAM(itemManager+0x18);
+    while (itemCount--) { // 各アイテムに対して
+      // ロード
+      writeRAM(readRAM(ptrItem)+0xf0, readRAM(slot));
+      // 次へ
+      ptrItem += 4;
+      slot += 4;
+    }
+  }
+  // 前のQFに押されたボタンはこのQFに押されたボタンとなる
+  btn0 = btn;
+
+  // このQFの実行はここまで
+  yield;
+}
